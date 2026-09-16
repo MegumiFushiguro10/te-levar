@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Chatbot na Nuvem - A Arena</title>
+    <style>
+        /* CSS MANTIDO E MELHORADO */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #333; }
+        .chat-container { background: #ffffff; width: 90%; max-width: 450px; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); position: relative; display: flex; flex-direction: column; }
+        .chat-container h2 { margin-top: 5px; color: #1e293b; text-align: center; }
+        .historico { height: 350px; overflow-y: auto; background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; border: 1px solid #e2e8f0; }
+        .historico::-webkit-scrollbar { width: 6px; }
+        .historico::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .mensagem { padding: 10px 14px; border-radius: 15px; max-width: 85%; line-height: 1.4; word-wrap: break-word; font-size: 14.5px; }
+        .user { background: #007bff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .bot { background: #e2e8f0; color: #1e293b; align-self: flex-start; border-bottom-left-radius: 2px; }
+        
+        /* NOVO: Balão para exibir a imagem vinda do Cloudinary */
+        .msg-imagem { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; font-size: 12px; }
+        
+        .loading-text { animation: pulse 1.5s infinite; font-style: italic; color: #64748b; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .input-group { display: flex; gap: 8px; }
+        input { padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 14px; outline: none; transition: border-color 0.3s; }
+        input:focus { border-color: #007bff; }
+        .input-chat { flex: 1; }
+        
+        button { padding: 12px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s ease; }
+        button:hover { filter: brightness(0.9); }
+        button:active { transform: scale(0.97); }
+        .btn-enviar { background: #28a745; width: 80px; }
+        .btn-ranking { width: 100%; margin-top: 15px; background: #f59e0b; color: white; font-size: 16px; }
+        .btn-sair { background: #ef4444; font-size: 12px; padding: 6px 12px; position: absolute; top: 15px; right: 15px; }
+        
+        /* 🔥 NOVOS ESTILOS DO PREVIEW DA FOTO 🔥 */
+        .btn-anexo { background: #64748b; width: 45px; font-size: 16px; padding: 0;}
+        .preview-container { display: none; position: relative; margin-bottom: 10px; padding: 8px; background: #e2e8f0; border-radius: 8px; width: fit-content; }
+        .preview-container img { max-width: 80px; max-height: 80px; border-radius: 6px; border: 1px solid #cbd5e1; }
+        .btn-remover-preview { position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; font-weight: bold; padding: 0; display: flex; justify-content: center; align-items: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-content { background: white; width: 90%; max-width: 350px; padding: 30px 25px; border-radius: 12px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .modal-content h2 { margin-top: 0; color: #1e293b; margin-bottom: 20px; }
+        .modal-content input { width: 100%; margin-bottom: 12px; }
+        .fechar-modal { background: #64748b; width: 100%; margin-top: 15px; }
+        .btn-auth { width: 100%; background: #007bff; margin-top: 10px; font-size: 15px; }
+        .link-auth { color: #007bff; text-decoration: none; cursor: pointer; font-size: 14px; margin-top: 15px; display: block; transition: color 0.2s; }
+        .link-auth:hover { color: #0056b3; text-decoration: underline; }
+        .ranking-list { list-style: none; padding: 0; margin: 0; text-align: left; max-height: 250px; overflow-y: auto; }
+        .ranking-list li { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 15px; border-radius: 6px;}
+        .ranking-list li:nth-child(1) { font-weight: bold; font-size: 1.1em; color: #b48600; background: #fffbeb; border: 1px solid #fde68a; margin-bottom: 5px; }
+        .ranking-list li:nth-child(2) { font-weight: bold; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 5px; }
+        .ranking-list li:nth-child(3) { font-weight: bold; color: #9a3412; background: #fff7ed; border: 1px solid #ffedd5; margin-bottom: 5px; }
+        .xp-badge { background: #10b981; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+
+        /* 🩺 CSS DO HEALTH CHECK (INDICADOR DE SAÚDE) */
+        .health-indicator { position: absolute; top: 15px; left: 15px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; font-weight: bold; background: #f8fafc; padding: 4px 8px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background-color: #cbd5e1; transition: all 0.3s ease; }
+        .dot.online { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
+        .dot.offline { background-color: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    </style>
+</head>
+<body>
+
+    <!-- MODAL DE AUTENTICAÇÃO -->
+    <div id="modalAuth" class="modal">
+        <div class="modal-content" id="boxLogin">
+            <h2>🔑 Acesso à Arena</h2>
+            <input type="email" id="loginEmail" placeholder="Seu E-mail">
+            <input type="password" id="loginSenha" placeholder="Sua Senha">
+            <button class="btn-auth" onclick="fazerLogin()">Entrar</button>
+            <span class="link-auth" onclick="trocarAba('cadastro')">Novo por aqui? Cadastre-se</span>
+        </div>
+        <div class="modal-content" id="boxCadastro" style="display: none;">
+            <h2>🛡️ Novo Guerreiro</h2>
+            <input type="text" id="cadNome" placeholder="Nickname (Ex: Satoru)">
+            <input type="email" id="cadEmail" placeholder="E-mail">
+            <input type="password" id="cadSenha" placeholder="Crie uma Senha">
+            <button class="btn-auth" style="background: #10b981;" onclick="fazerCadastro()">Registrar e Entrar</button>
+            <span class="link-auth" onclick="trocarAba('login')">Já tem uma conta? Faça o Login</span>
+        </div>
+    </div>
+
+    <!-- CHAT PRINCIPAL -->
+    <div class="chat-container">
+        <button class="btn-sair" title="Deslogar" onclick="fazerLogout()">Sair</button>
+        <h2>🤖 Guardião Multimodal</h2>
+        
+        <div>
+            <input type="text" id="nickname" readonly style="margin-bottom: 15px; width: 100%; font-weight: bold; color: #0f172a; background: #f1f5f9; border: none; text-align: center; border-radius: 8px;">
+        </div>
+
+        <div class="historico" id="historico"></div>
+        
+        <!-- 🔥 CONTAINER DO PREVIEW DA IMAGEM 🔥 -->
+        <div class="preview-container" id="previewContainer">
+            <img id="imagemPreview" src="" alt="Preview da imagem">
+            <button class="btn-remover-preview" onclick="removerPreview()" title="Remover imagem">X</button>
+        </div>
+
+        <!-- BOTOES E INPUTS -->
+        <div class="input-group">
+            <!-- Esse input file fica escondido. A gente clica no botão do clipe pra acionar ele -->
+            <input type="file" id="imagemUpload" accept="image/*" style="display: none;" onchange="mostrarPreview()">
+            
+            <button type="button" class="btn-anexo" title="Anexar Imagem" onclick="document.getElementById('imagemUpload').click()">📎</button>
+            <input type="text" id="pergunta" class="input-chat" placeholder="Digite sua mensagem (com ou sem foto)...">
+            <button class="btn-enviar" onclick="enviarMensagem()">Enviar</button>
+        </div>
+        
+        <!-- CHAT PRINCIPAL -->
+    <div class="chat-container">
+        <button class="btn-sair" title="Deslogar" onclick="fazerLogout()">Sair</button>
+        
+        <!-- 🟢 LUZ DE HEALTH CHECK -->
+        <div class="health-indicator" title="Status da API">
+            <div class="dot" id="serverDot"></div>
+            <span id="serverText">Iniciando...</span>
+        </div>
+
+        <h2>🤖 Guardião Multimodal</h2>
+        <!-- ... restante do código (input do nickname, etc) -->
+        <button class="btn-ranking" onclick="verRanking()">🏆 Ver Ranking Global</button>
+    </div>
+
+    <!-- MODAL DO HALL DA FAMA -->
+    <div id="modalRanking" class="modal">
+        <div class="modal-content">
+            <h2>🏆 Hall da Fama</h2>
+            <ul id="listaRanking" class="ranking-list"></ul>
+            <button class="fechar-modal" onclick="fecharRanking()">Fechar Aba</button>
+        </div>
+    </div>
+
+    <script>
+        const URL_CHAT = "http://localhost:3000/api/chat";
+        const URL_AUTH = "http://localhost:3000/api/auth";
+
+        // ==========================================
+        // LÓGICA DE AUTH MANTIDA
+        // ==========================================
+        window.onload = () => {
+
+            verificarSaudeServidor(); 
+
+            const token = localStorage.getItem('token_saas');
+            const nome = localStorage.getItem('nome_usuario');
+            if (token && nome) {
+                document.getElementById('modalAuth').style.display = 'none';
+                document.getElementById('nickname').value = `Logado como: ${nome}`;
+                carregarHistorico(); // 👈 ADICIONE AQUI!
+            } else {
+                document.getElementById('modalAuth').style.display = 'flex';
+            }
+        };
+
+        function trocarAba(aba) {
+            document.getElementById('boxLogin').style.display = aba === 'login' ? 'block' : 'none';
+            document.getElementById('boxCadastro').style.display = aba === 'cadastro' ? 'block' : 'none';
+        }
+
+        async function fazerLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const senha = document.getElementById('loginSenha').value;
+            const btn = document.querySelector('#boxLogin .btn-auth');
+            if(!email || !senha) return alert("Preencha todos os campos!");
+            btn.innerText = "Conectando...";
+            try {
+                const resposta = await fetch(`${URL_AUTH}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+                const dados = await resposta.json();
+                if (dados.sucesso) {
+                    localStorage.setItem('token_saas', dados.token);
+                    localStorage.setItem('nome_usuario', dados.usuario.nome);
+                    document.getElementById('nickname').value = `Logado como: ${dados.usuario.nome}`;
+                    document.getElementById('modalAuth').style.display = 'none';
+                    carregarHistorico(); // 👈 ADICIONE AQUI TAMBÉM!
+                } else { alert("Erro: " + dados.erro); }
+            } catch (erro) { alert("Erro ao conectar com o servidor."); } finally { btn.innerText = "Entrar"; }
+        }
+
+        async function fazerCadastro() {
+            const nome = document.getElementById('cadNome').value.trim();
+            const email = document.getElementById('cadEmail').value.trim();
+            const senha = document.getElementById('cadSenha').value;
+            if(!nome || !email || !senha) return alert("Preencha todos os campos!");
+            try {
+                const resposta = await fetch(`${URL_AUTH}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, email, senha })
+                });
+                const dados = await resposta.json();
+                if (dados.sucesso) {
+                    alert("Guerreiro registrado! Agora faça seu Login.");
+                    trocarAba('login');
+                    document.getElementById('loginEmail').value = email; 
+                } else { alert("Erro: " + dados.erro); }
+            } catch (erro) { alert("Erro ao conectar com o servidor."); }
+        }
+
+        function fazerLogout() {
+            localStorage.removeItem('token_saas');
+            localStorage.removeItem('nome_usuario');
+            window.location.reload();
+        }
+
+        // ==========================================
+        // 🔥 LÓGICA DE MULTIMÍDIA E CHAT
+        // ==========================================
+        
+        // 1. Mostra a miniatura da foto selecionada
+        function mostrarPreview() {
+            const inputUpload = document.getElementById('imagemUpload');
+            const container = document.getElementById('previewContainer');
+            const imgPreview = document.getElementById('imagemPreview');
+
+            if (inputUpload.files && inputUpload.files[0]) {
+                const leitor = new FileReader();
+                leitor.onload = function(e) {
+                    imgPreview.src = e.target.result;
+                    container.style.display = 'block'; // Mostra a caixa
+                }
+                leitor.readAsDataURL(inputUpload.files[0]);
+            }
+        }
+
+        // 2. Remove a miniatura e limpa o input caso o usuário desista
+        function removerPreview() {
+            document.getElementById('imagemUpload').value = "";
+            document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('imagemPreview').src = "";
+        }
+
+        function formatarTexto(texto) {
+            return texto.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
+        }
+
+        async function enviarMensagem() {
+            const inputPergunta = document.getElementById("pergunta");
+            const historico = document.getElementById("historico");
+            const inputUpload = document.getElementById("imagemUpload");
+            
+            let nick = document.getElementById("nickname").value.replace("Logado como: ", "").trim();
+            const texto = inputPergunta.value.trim();
+            const arquivo = inputUpload.files[0]; // Verifica se tem foto
+            const token = localStorage.getItem('token_saas');
+
+            if(!texto && !arquivo) return;
+            
+            // Regra do Guardião: não mande foto sem texto!
+            if(arquivo && !texto) {
+                return alert("Por favor, digite uma mensagem para acompanhar a sua imagem!");
+            }
+
+            // Exibe a mensagem do usuário no chat
+            historico.innerHTML += `<div class="mensagem user">${texto}</div>`;
+            
+            // Limpa o formulário na mesma hora para o usuário achar que já foi
+            inputPergunta.value = "";
+            removerPreview(); 
+
+            historico.innerHTML += `<div class="mensagem bot loading-text" id="loading">Refletindo e analisando...</div>`;
+            historico.scrollTop = historico.scrollHeight;
+            inputPergunta.focus();
+
+            try {
+                let resposta;
+
+                // 🌟 A MÁGICA DO FORMDATA ACONTECE AQUI 🌟
+                if (arquivo) {
+                    const formData = new FormData();
+                    formData.append("imagem", arquivo); // Este nome DEVE ser igual ao que ta no Back-end (upload.single('imagem'))
+                    formData.append("pergunta", texto);
+                    formData.append("nickname", nick);
+
+                    resposta = await fetch(URL_CHAT + "/vision", {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${token}` }, // 👈 ATENÇÃO: Nada de Content-Type aqui!
+                        body: formData
+                    });
+                } else {
+                    // SE NÃO TEM ARQUIVO, VAI O TEXTO NORMAL!
+                    resposta = await fetch(URL_CHAT, {
+                        method: "POST",
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ pergunta: texto, nickname: nick }) 
+                    });
+                }
+
+                if (resposta.status === 401) {
+                    alert("Sua sessão expirou. A magia acabou, faça login novamente!");
+                    return fazerLogout();
+                }
+
+                const dados = await resposta.json();
+                document.getElementById("loading").remove();
+
+                if(dados.erro) {
+                    historico.innerHTML += `<div class="mensagem bot" style="color:red">Erro: ${dados.erro}</div>`;
+                    return;
+                }
+                
+                // 🔥 SE A IMAGEM SUBIU PRO CLOUDINARY COM SUCESSO, MOSTRA ELA COMO UM BALÃO DE CHAT
+                if (dados.urlImagem) {
+                    historico.innerHTML += `
+                        <div class="mensagem msg-imagem">
+                            <span style="color:#cbd5e1; margin-bottom:5px; display:block;">Anexo salvo na Nuvem ☁️</span>
+                            <img src="${dados.urlImagem}" style="max-width: 100%; border-radius: 8px;">
+                        </div>`;
+                }
+
+                const respostaFormatada = formatarTexto(dados.resposta);
+                historico.innerHTML += `<div class="mensagem bot">${respostaFormatada}</div>`;
+                historico.scrollTop = historico.scrollHeight;
+
+            } catch (erro) {
+                document.getElementById("loading").innerHTML = "❌ O Guardião perdeu a conexão mental. Tente novamente.";
+            }
+        }
+
+        // ==========================================
+        // LÓGICA DO RANKING MANTIDA
+        // ==========================================
+        async function verRanking() {
+            const modal = document.getElementById("modalRanking");
+            const lista = document.getElementById("listaRanking");
+            const token = localStorage.getItem('token_saas');
+            
+            lista.innerHTML = "<li style='justify-content:center'>Invocando guerreiros... ⏳</li>";
+            modal.style.display = "flex";
+
+            try {
+                const resposta = await fetch(URL_CHAT + "/ranking", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+
+                if (resposta.status === 401) return fazerLogout();
+
+                const dados = await resposta.json();
+
+                if (dados.sucesso && dados.ranking.length > 0) {
+                    lista.innerHTML = "";
+                    dados.ranking.forEach((jogador, index) => {
+                        let medalha = `${index + 1}º - `;
+                        if (index === 0) medalha = "🥇 ";
+                        else if (index === 1) medalha = "🥈 ";
+                        else if (index === 2) medalha = "🥉 ";
+
+                        lista.innerHTML += `
+                            <li>
+                                <span>${medalha} ${jogador.nickname}</span>
+                                <span class="xp-badge">${jogador.xp} XP</span>
+                            </li>
+                        `;
+                    });
+                } else { lista.innerHTML = "<li style='justify-content:center; color:#64748b'>Nenhum guerreiro provou seu valor ainda. ⚔️</li>"; }
+            } catch (erro) { lista.innerHTML = "<li style='justify-content:center; color:#ef4444'>❌ Falha ao invocar os pergaminhos do Ranking.</li>"; }
+        }
+
+        function fecharRanking() { document.getElementById("modalRanking").style.display = "none"; }
+
+        document.getElementById("pergunta").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") enviarMensagem();
+        });
+
+        async function carregarHistorico() {
+            const token = localStorage.getItem('token_saas');
+            if(!token) return;
+
+            try {
+                const resposta = await fetch(URL_CHAT + '/historico', {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                const dados = await resposta.json();
+
+                if(dados.sucesso) {
+                    const divHistorico = document.getElementById("historico");
+                    divHistorico.innerHTML = ""; // Limpa a tela
+
+                    dados.historico.forEach(msg => {
+                        if (msg.role === 'user') {
+                            // Limpa a tag de identificação do backend para exibir limpo pro usuário
+                            const textoLimpo = msg.parts[0].text.replace(/\[Jogador:.*?\] diz(?: \(Com Foto\))?: /, '');
+                            divHistorico.innerHTML += `<div class="mensagem user">${textoLimpo}</div>`;
+                            
+                            // Renderiza a imagem perfeitamente se existir!
+                            if (msg.imagemUrl) {
+                                divHistorico.innerHTML += `
+                                    <div class="mensagem msg-imagem">
+                                        <span style="color:#cbd5e1; margin-bottom:5px; display:block;">Anexo salvo na Nuvem ☁️</span>
+                                        <img src="${msg.imagemUrl}" style="max-width: 100%; border-radius: 8px;">
+                                    </div>`;
+                            }
+                        } else {
+                            // Se for o bot, formata bonitinho
+                            const textoFormatado = formatarTexto(msg.parts[0].text);
+                            divHistorico.innerHTML += `<div class="mensagem bot">${textoFormatado}</div>`;
+                        }
+                    });
+                    // Joga o scroll pro final
+                    divHistorico.scrollTop = divHistorico.scrollHeight;
+                }
+            } catch (erro) {
+                console.log("Falha ao carregar o histórico.");
+            }
+        }
+
+        // ==========================================
+        // 🩺 SISTEMA DE HEALTH CHECK (MONITORAMENTO)
+        // ==========================================
+        async function verificarSaudeServidor() {
+            const dot = document.getElementById('serverDot');
+            const text = document.getElementById('serverText');
+            
+            try {
+                // Faz a requisição na rota pública que acabamos de criar
+                const resposta = await fetch("http://localhost:3000/api/health");
+                
+                if (resposta.ok) {
+                    const dados = await resposta.json();
+                    
+                    if (dados.status === "ok" && dados.bancoDeDados === "conectado") {
+                        dot.className = "dot online";
+                        text.innerText = "Sistema Operacional";
+                        text.style.color = "#10b981";
+                    } else {
+                        dot.className = "dot offline";
+                        text.innerText = "Banco Offline";
+                        text.style.color = "#ef4444";
+                    }
+                } else {
+                    throw new Error("Erro na resposta");
+                }
+            } catch (erro) {
+                // Se der catch, significa que o servidor Node está desligado ou inacessível
+                dot.className = "dot offline";
+                text.innerText = "API Offline";
+                text.style.color = "#ef4444";
+            }
+        }
+    </script>
+</body>
+</html>
