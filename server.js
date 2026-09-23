@@ -68,4 +68,10 @@ app.get('/api/health', (req, res) => {
     }
 });
 
+// No topo do server.js, junto com os outros requires:
+const documentRoutes = require('./routes/documentRoutes');
+
+// Na seção 4 (Apontamento de Rotas):
+app.use('/api/chat', documentRoutes); // Isso vai criar o endpoint POST /api/chat/documento
+
 // ... código posterior (Tratamento de Erros de Upload...)

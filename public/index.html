@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Chatbot na Nuvem - A Arena & Analista RAG</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #333; }
+        .chat-container { background: #ffffff; width: 90%; max-width: 480px; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); position: relative; display: flex; flex-direction: column; }
+        .chat-container h2 { margin-top: 5px; color: #1e293b; text-align: center; font-size: 1.3rem; }
+        .historico { height: 350px; overflow-y: auto; background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; border: 1px solid #e2e8f0; }
+        .historico::-webkit-scrollbar { width: 6px; }
+        .historico::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .mensagem { padding: 10px 14px; border-radius: 15px; max-width: 85%; line-height: 1.4; word-wrap: break-word; font-size: 14.5px; }
+        .user { background: #007bff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .bot { background: #e2e8f0; color: #1e293b; align-self: flex-start; border-bottom-left-radius: 2px; }
+        
+        /* Balões especiais para anexos */
+        .msg-imagem { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 2px; font-size: 12px; }
+        .msg-doc { background: #475569; color: #f8fafc; align-self: flex-end; border-bottom-right-radius: 2px; font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+        
+        .loading-text { animation: pulse 1.5s infinite; font-style: italic; color: #64748b; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .input-group { display: flex; gap: 6px; align-items: center; }
+        input { padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 14px; outline: none; transition: border-color 0.3s; }
+        input:focus { border-color: #007bff; }
+        .input-chat { flex: 1; }
+        
+        button { padding: 12px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s ease; }
+        button:hover { filter: brightness(0.9); }
+        button:active { transform: scale(0.97); }
+        .btn-enviar { background: #28a745; width: 75px; }
+        .btn-ranking { width: 100%; margin-top: 12px; background: #f59e0b; color: white; font-size: 15px; }
+        .btn-sair { background: #ef4444; font-size: 12px; padding: 6px 12px; position: absolute; top: 15px; right: 15px; }
+        
+        /* Botões de anexos */
+        .btn-anexo { background: #64748b; width: 40px; height: 42px; font-size: 17px; padding: 0; display: flex; justify-content: center; align-items: center; }
+        .btn-doc { background: #0284c7; }
+
+        /* Previews de arquivos antes de enviar */
+        .preview-container { display: none; position: relative; margin-bottom: 8px; padding: 6px 10px; background: #e2e8f0; border-radius: 8px; width: fit-content; }
+        .preview-container img { max-width: 70px; max-height: 70px; border-radius: 6px; border: 1px solid #cbd5e1; }
+        .preview-doc { font-size: 13px; font-weight: 600; color: #0369a1; display: flex; align-items: center; gap: 8px; padding-right: 20px; }
+        .btn-remover-preview { position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; font-weight: bold; padding: 0; display: flex; justify-content: center; align-items: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-content { background: white; width: 90%; max-width: 350px; padding: 30px 25px; border-radius: 12px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .modal-content h2 { margin-top: 0; color: #1e293b; margin-bottom: 20px; }
+        .modal-content input { width: 100%; margin-bottom: 12px; }
+        .fechar-modal { background: #64748b; width: 100%; margin-top: 15px; }
+        .btn-auth { width: 100%; background: #007bff; margin-top: 10px; font-size: 15px; }
+        .link-auth { color: #007bff; text-decoration: none; cursor: pointer; font-size: 14px; margin-top: 15px; display: block; }
+        .ranking-list { list-style: none; padding: 0; margin: 0; text-align: left; max-height: 250px; overflow-y: auto; }
+        .ranking-list li { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+        .xp-badge { background: #10b981; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- MODAL DE AUTENTICAÇÃO -->
+    <div id="modalAuth" class="modal">
+        <div class="modal-content" id="boxLogin">
+            <h2>🔑 Acesso à Arena</h2>
+            <input type="email" id="loginEmail" placeholder="Seu E-mail">
+            <input type="password" id="loginSenha" placeholder="Sua Senha">
+            <button class="btn-auth" onclick="fazerLogin()">Entrar</button>
+            <span class="link-auth" onclick="trocarAba('cadastro')">Novo por aqui? Cadastre-se</span>
+        </div>
+        <div class="modal-content" id="boxCadastro" style="display: none;">
+            <h2>🛡️ Novo Guerreiro</h2>
+            <input type="text" id="cadNome" placeholder="Nickname (Ex: Satoru)">
+            <input type="email" id="cadEmail" placeholder="E-mail">
+            <input type="password" id="cadSenha" placeholder="Crie uma Senha">
+            <button class="btn-auth" style="background: #10b981;" onclick="fazerCadastro()">Registrar e Entrar</button>
+            <span class="link-auth" onclick="trocarAba('login')">Já tem uma conta? Faça o Login</span>
+        </div>
+    </div>
+
+    <!-- CHAT PRINCIPAL -->
+    <div class="chat-container">
+        <button class="btn-sair" title="Deslogar" onclick="fazerLogout()">Sair</button>
+        <h2>🤖 Guardião & Analista RAG</h2>
+        
+        <div>
+            <input type="text" id="nickname" readonly style="margin-bottom: 12px; width: 100%; font-weight: bold; color: #0f172a; background: #f1f5f9; border: none; text-align: center; border-radius: 8px;">
+        </div>
+
+        <div class="historico" id="historico"></div>
+        
+        <!-- PREVIEW DE IMAGEM -->
+        <div class="preview-container" id="previewContainer">
+            <img id="imagemPreview" src="" alt="Preview da imagem">
+            <button class="btn-remover-preview" onclick="removerPreviewImagem()" title="Remover imagem">X</button>
+        </div>
+
+        <!-- 📄 NOVO: PREVIEW DO DOCUMENTO -->
+        <div class="preview-container" id="previewDocContainer">
+            <span class="preview-doc" id="previewDocNome">📄 documento.pdf</span>
+            <button class="btn-remover-preview" onclick="removerPreviewDoc()" title="Remover documento">X</button>
+        </div>
+
+        <!-- BOTÕES E INPUTS -->
+        <div class="input-group">
+            <!-- Input escondido de Imagem -->
+            <input type="file" id="imagemUpload" accept="image/*" style="display: none;" onchange="mostrarPreviewImagem()">
+            <button type="button" class="btn-anexo" title="Anexar Imagem" onclick="document.getElementById('imagemUpload').click()">📎</button>
+
+            <!-- 📄 NOVO: Input escondido de Documento (PDF/TXT) -->
+            <input type="file" id="docUpload" accept=".pdf, .txt" style="display: none;" onchange="mostrarPreviewDoc()">
+            <button type="button" class="btn-anexo btn-doc" title="Conversar com Documento (PDF/TXT)" onclick="document.getElementById('docUpload').click()">📄</button>
+            
+            <input type="text" id="pergunta" class="input-chat" placeholder="Pergunte algo ou consulte seu PDF...">
+            <button class="btn-enviar" onclick="enviarMensagem()">Enviar</button>
+        </div>
+        
+        <button class="btn-ranking" onclick="verRanking()">🏆 Ver Ranking Global</button>
+    </div>
+
+    <!-- MODAL DO HALL DA FAMA -->
+    <div id="modalRanking" class="modal">
+        <div class="modal-content">
+            <h2>🏆 Hall da Fama</h2>
+            <ul id="listaRanking" class="ranking-list"></ul>
+            <button class="fechar-modal" onclick="fecharRanking()">Fechar Aba</button>
+        </div>
+    </div>
+
+    <script>
+        const URL_CHAT = "http://localhost:3000/api/chat";
+        const URL_AUTH = "http://localhost:3000/api/auth";
+
+        // ==========================================
+        // AUTENTICAÇÃO
+        // ==========================================
+        window.onload = () => {
+            const token = localStorage.getItem('token_saas');
+            const nome = localStorage.getItem('nome_usuario');
+            if (token && nome) {
+                document.getElementById('modalAuth').style.display = 'none';
+                document.getElementById('nickname').value = `Logado como: ${nome}`;
+                carregarHistorico();
+            } else {
+                document.getElementById('modalAuth').style.display = 'flex';
+            }
+        };
+
+        function trocarAba(aba) {
+            document.getElementById('boxLogin').style.display = aba === 'login' ? 'block' : 'none';
+            document.getElementById('boxCadastro').style.display = aba === 'cadastro' ? 'block' : 'none';
+        }
+
+        async function fazerLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const senha = document.getElementById('loginSenha').value;
+            const btn = document.querySelector('#boxLogin .btn-auth');
+            if(!email || !senha) return alert("Preencha todos os campos!");
+            btn.innerText = "Conectando...";
+            try {
+                const resposta = await fetch(`${URL_AUTH}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+                const dados = await resposta.json();
+                if (dados.sucesso) {
+                    localStorage.setItem('token_saas', dados.token);
+                    localStorage.setItem('nome_usuario', dados.usuario.nome);
+                    document.getElementById('nickname').value = `Logado como: ${dados.usuario.nome}`;
+                    document.getElementById('modalAuth').style.display = 'none';
+                    carregarHistorico();
+                } else { alert("Erro: " + dados.erro); }
+            } catch (erro) { alert("Erro ao conectar com o servidor."); } finally { btn.innerText = "Entrar"; }
+        }
+
+        async function fazerCadastro() {
+            const nome = document.getElementById('cadNome').value.trim();
+            const email = document.getElementById('cadEmail').value.trim();
+            const senha = document.getElementById('cadSenha').value;
+            if(!nome || !email || !senha) return alert("Preencha todos os campos!");
+            try {
+                const resposta = await fetch(`${URL_AUTH}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, email, senha })
+                });
+                const dados = await resposta.json();
+                if (dados.sucesso) {
+                    alert("Guerreiro registrado! Agora faça seu Login.");
+                    trocarAba('login');
+                    document.getElementById('loginEmail').value = email; 
+                } else { alert("Erro: " + dados.erro); }
+            } catch (erro) { alert("Erro ao conectar com o servidor."); }
+        }
+
+        function fazerLogout() {
+            localStorage.removeItem('token_saas');
+            localStorage.removeItem('nome_usuario');
+            window.location.reload();
+        }
+
+        // ==========================================
+        // GERENCIAMENTO DE ANEXOS (IMAGEM E DOCUMENTO)
+        // ==========================================
+        function mostrarPreviewImagem() {
+            removerPreviewDoc(); // Se escolher foto, limpa o documento
+            const inputUpload = document.getElementById('imagemUpload');
+            const container = document.getElementById('previewContainer');
+            const imgPreview = document.getElementById('imagemPreview');
+
+            if (inputUpload.files && inputUpload.files[0]) {
+                const leitor = new FileReader();
+                leitor.onload = function(e) {
+                    imgPreview.src = e.target.result;
+                    container.style.display = 'block';
+                }
+                leitor.readAsDataURL(inputUpload.files[0]);
+            }
+        }
+
+        function removerPreviewImagem() {
+            document.getElementById('imagemUpload').value = "";
+            document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('imagemPreview').src = "";
+        }
+
+        function mostrarPreviewDoc() {
+            removerPreviewImagem(); // Se escolher documento, limpa a foto
+            const inputDoc = document.getElementById('docUpload');
+            const container = document.getElementById('previewDocContainer');
+            const nomeDoc = document.getElementById('previewDocNome');
+
+            if (inputDoc.files && inputDoc.files[0]) {
+                nomeDoc.innerText = `📄 ${inputDoc.files[0].name}`;
+                container.style.display = 'block';
+            }
+        }
+
+        function removerPreviewDoc() {
+            document.getElementById('docUpload').value = "";
+            document.getElementById('previewDocContainer').style.display = 'none';
+            document.getElementById('previewDocNome').innerText = "";
+        }
+
+        function formatarTexto(texto) {
+            return texto.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
+        }
+
+        // ==========================================
+        // DISPARO DE MENSAGENS (TEXTO, VISÃO OU RAG)
+        // ==========================================
+        async function enviarMensagem() {
+            const inputPergunta = document.getElementById("pergunta");
+            const historico = document.getElementById("historico");
+            const inputImagem = document.getElementById("imagemUpload");
+            const inputDoc = document.getElementById("docUpload");
+            
+            let nick = document.getElementById("nickname").value.replace("Logado como: ", "").trim();
+            const texto = inputPergunta.value.trim();
+            const arquivoImagem = inputImagem.files[0];
+            const arquivoDoc = inputDoc.files[0];
+            const token = localStorage.getItem('token_saas');
+
+            if (!texto && !arquivoImagem && !arquivoDoc) return;
+            
+            // Regra: Não enviar anexo sem pergunta
+            if ((arquivoImagem || arquivoDoc) && !texto) {
+                return alert("Por favor, digite uma pergunta acompanhando o seu anexo!");
+            }
+
+            // Exibe a mensagem do usuário no chat
+            historico.innerHTML += `<div class="mensagem user">${texto}</div>`;
+            
+            // Se for documento, exibe badge visual no chat
+            if (arquivoDoc) {
+                historico.innerHTML += `<div class="mensagem msg-doc">📄 Consultado no documento: <b>${arquivoDoc.name}</b></div>`;
+            }
+
+            // Limpa inputs imediatamente para agilidade de interface
+            inputPergunta.value = "";
+            removerPreviewImagem();
+            removerPreviewDoc();
+
+            historico.innerHTML += `<div class="mensagem bot loading-text" id="loading">Analisando dados com precisão...</div>`;
+            historico.scrollTop = historico.scrollHeight;
+            inputPergunta.focus();
+
+            try {
+                let resposta;
+
+                // 1. ROTA RAG: Documento (PDF / TXT)
+                if (arquivoDoc) {
+                    const formData = new FormData();
+                    formData.append("documento", arquivoDoc);
+                    formData.append("pergunta", texto);
+
+                    resposta = await fetch(`${URL_CHAT}/documento`, {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${token}` },
+                        body: formData
+                    });
+                } 
+                // 2. ROTA DE VISÃO: Imagem (Multimodal)
+                else if (arquivoImagem) {
+                    const formData = new FormData();
+                    formData.append("imagem", arquivoImagem);
+                    formData.append("pergunta", texto);
+                    formData.append("nickname", nick);
+
+                    resposta = await fetch(`${URL_CHAT}/vision`, {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${token}` },
+                        body: formData
+                    });
+                } 
+                // 3. ROTA PADRÃO: Chat de Texto
+                else {
+                    resposta = await fetch(URL_CHAT, {
+                        method: "POST",
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ pergunta: texto, nickname: nick }) 
+                    });
+                }
+
+                if (resposta.status === 401) {
+                    alert("Sua sessão expirou. Faça login novamente!");
+                    return fazerLogout();
+                }
+
+                const dados = await resposta.json();
+                const loadingElem = document.getElementById("loading");
+                if (loadingElem) loadingElem.remove();
+
+                if (dados.erro) {
+                    historico.innerHTML += `<div class="mensagem bot" style="color:red">Erro: ${dados.erro}</div>`;
+                    return;
+                }
+                
+                // Exibe imagem se veio da rota /vision
+                if (dados.urlImagem) {
+                    historico.innerHTML += `
+                        <div class="mensagem msg-imagem">
+                            <span style="color:#cbd5e1; margin-bottom:5px; display:block;">Anexo salvo na Nuvem ☁️</span>
+                            <img src="${dados.urlImagem}" style="max-width: 100%; border-radius: 8px;">
+                        </div>`;
+                }
+
+                const respostaFormatada = formatarTexto(dados.resposta);
+                historico.innerHTML += `<div class="mensagem bot">${respostaFormatada}</div>`;
+                historico.scrollTop = historico.scrollHeight;
+
+            } catch (erro) {
+                const loadingElem = document.getElementById("loading");
+                if (loadingElem) loadingElem.innerHTML = "❌ O Analista perdeu a conexão. Tente novamente.";
+            }
+        }
+
+        // ==========================================
+        // RANKING E HISTÓRICO
+        // ==========================================
+        async function verRanking() {
+            const modal = document.getElementById("modalRanking");
+            const lista = document.getElementById("listaRanking");
+            const token = localStorage.getItem('token_saas');
+            
+            lista.innerHTML = "<li style='justify-content:center'>Invocando guerreiros... ⏳</li>";
+            modal.style.display = "flex";
+
+            try {
+                const resposta = await fetch(`${URL_CHAT}/ranking`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+
+                if (resposta.status === 401) return fazerLogout();
+
+                const dados = await resposta.json();
+
+                if (dados.sucesso && dados.ranking.length > 0) {
+                    lista.innerHTML = "";
+                    dados.ranking.forEach((jogador, index) => {
+                        let medalha = `${index + 1}º - `;
+                        if (index === 0) medalha = "🥇 ";
+                        else if (index === 1) medalha = "🥈 ";
+                        else if (index === 2) medalha = "🥉 ";
+
+                        lista.innerHTML += `
+                            <li>
+                                <span>${medalha} ${jogador.nickname}</span>
+                                <span class="xp-badge">${jogador.xp} XP</span>
+                            </li>
+                        `;
+                    });
+                } else { lista.innerHTML = "<li style='justify-content:center; color:#64748b'>Nenhum guerreiro no Hall da Fama. ⚔️</li>"; }
+            } catch (erro) { lista.innerHTML = "<li style='justify-content:center; color:#ef4444'>❌ Falha ao invocar os pergaminhos do Ranking.</li>"; }
+        }
+
+        function fecharRanking() { document.getElementById("modalRanking").style.display = "none"; }
+
+        document.getElementById("pergunta").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") enviarMensagem();
+        });
+
+        async function carregarHistorico() {
+            const token = localStorage.getItem('token_saas');
+            if(!token) return;
+        
+
+            try {
+                const resposta = await fetch(`${URL_CHAT}/historico`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                const dados = await resposta.json();
+
+                if(dados.sucesso) {
+                    const divHistorico = document.getElementById("historico");
+                    divHistorico.innerHTML = "";
+
+                    dados.historico.forEach(msg => {
+                        if (msg.role === 'user') {
+                            const textoLimpo = msg.parts[0].text.replace(/\[Jogador:.*?\] diz(?: \(Com Foto\))?: /, '');
+                            divHistorico.innerHTML += `<div class="mensagem user">${textoLimpo}</div>`;
+                            
+                            if (msg.imagemUrl) {
+                                divHistorico.innerHTML += `
+                                    <div class="mensagem msg-imagem">
+                                        <span style="color:#cbd5e1; margin-bottom:5px; display:block;">Anexo salvo na Nuvem ☁️</span>
+                                        <img src="${msg.imagemUrl}" style="max-width: 100%; border-radius: 8px;">
+                                    </div>`;
+                            }
+                        } else {
+                            const textoFormatado = formatarTexto(msg.parts[0].text);
+                            divHistorico.innerHTML += `<div class="mensagem bot">${textoFormatado}</div>`;
+                        }
+                    });
+                    divHistorico.scrollTop = divHistorico.scrollHeight;
+                }
+            } catch (erro) {
+                console.log("Falha ao carregar o histórico.");
+            }
+        }
+        
+    </script>
+
+    <!-- CDN Oficial do Marked.js -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</body>
+</html>
