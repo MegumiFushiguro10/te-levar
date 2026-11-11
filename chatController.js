@@ -232,7 +232,20 @@ async function conversarComVisao(req, res) {
         };
 
         const result = await model.generateContent([pergunta, imagemParaGemini]);
+        // 🪙 Captura a telemetria de tokens do Gemini
+        let totalTokens = result.response.usageMetadata?.totalTokenCount || 0;
+        console.log(`🪙 Tokens consumidos nesta interação: ${totalTokens}`);
+
         const respostaDaIA = result.response.text();
+
+        // Salva a resposta no MongoDB com os tokens computados
+        await Mensagem.create({ 
+            role: "model", 
+            parts: [{ text: respostaDaIA }],
+            tokensGastos: totalTokens
+        });
+
+        return res.status(200).json({ sucesso: true, resposta: respostaDaIA });
 
         // 4. Salva tudo no Banco de Dados (MongoDB)
         const textoComNome = `[Jogador: ${nickname || 'Anônimo'}] diz (Com Foto): ${pergunta}`;

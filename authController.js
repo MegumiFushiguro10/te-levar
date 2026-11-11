@@ -43,26 +43,36 @@ async function login(req, res) {
         if (!senhaValida) {
             return res.status(400).json({ erro: "E-mail ou senha incorretos." });
         }
+// ... código anterior do login ...
 
-        // 3. Gera o Token JWT contendo o ID e o nome do usuário
+        // 3. Gera o Token JWT contendo o ID, nome e o ROLE do usuário
         const secret = process.env.JWT_SECRET;
         if (!secret) {
             throw new Error("Chave JWT_SECRET não configurada no .env");
         }
 
         const token = jwt.sign(
-            { id: usuario._id, nome: usuario.nome }, 
+            { 
+                id: usuario._id, 
+                nome: usuario.nome,
+                role: usuario.role // 👈 ADICIONE AQUI: o crachá vai dentro do token!
+            }, 
             secret, 
-            { expiresIn: '1d' } // O token expira em 1 dia
+            { expiresIn: '1d' }
         );
 
-        // 4. Devolve o Token e os dados do usuário
+        // 4. Devolve o Token e os dados do usuário (incluindo o role)
         return res.status(200).json({ 
             sucesso: true, 
             mensagem: "Bem-vindo de volta!",
             token: token,
-            usuario: { nome: usuario.nome }
+            usuario: { 
+                nome: usuario.nome,
+                role: usuario.role // 👈 Útil para o front-end saber o que exibir
+            }
         });
+
+// ... restante da função ...
 
     } catch (erro) {
         console.error("❌ Erro no login:", erro);

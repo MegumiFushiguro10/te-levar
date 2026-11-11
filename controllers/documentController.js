@@ -87,6 +87,13 @@ PERGUNTA DO USUÁRIO: ${pergunta.trim()}
         // =========================================================================
         // 4. (OPCIONAL) REGISTRO NO BANCO DE DADOS
         // =========================================================================
+        const result = await model.generateContent(promptRAG);
+        const respostaDaIA = result.response.text();
+
+        // 🪙 Captura tokens da leitura de PDF/TXT
+        const tokensDoc = result.response.usageMetadata?.totalTokenCount || 0;
+        console.log(`🪙 Tokens consumidos no RAG: ${tokensDoc}`);
+
         const nickname = req.usuario.nome || "Guerreiro";
         const perguntaFormatada = `[Documento: ${arquivo.originalname}] [${nickname}]: ${pergunta}`;
 
@@ -95,9 +102,11 @@ PERGUNTA DO USUÁRIO: ${pergunta.trim()}
             parts: [{ text: perguntaFormatada }]
         });
 
+        // Salva com os tokens
         await Mensagem.create({
             role: "model",
-            parts: [{ text: respostaDaIA }]
+            parts: [{ text: respostaDaIA }],
+            tokensGastos: tokensDoc
         });
 
         // =========================================================================

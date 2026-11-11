@@ -3,6 +3,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+// No topo do server.js:
+const analyticsRoutes = require('./routes/analyticsRoutes');
+
+// Na seção 4 (onde estão os app.use
 
 // 1. Importação das rotas
 const chatRoutes = require('./routes/chatRoutes');
@@ -24,6 +28,7 @@ mongoose.connect(process.env.MONGO_URI)
 // 4. Apontamento de Rotas
 app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes); 
+app.use('/api/analytics', analyticsRoutes);
 
 // 5. Tratamento de Erros de Upload (Multer) - Critério de Aceite 4
 app.use((err, req, res, next) => {
